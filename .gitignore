@@ -1,0 +1,56 @@
+Node.js / TypeScript
+
+node_modules/
+dist/
+*.tsbuildinfo
+
+Python / MLX / Virtual Environments
+
+pfsd_venv/
+.venv/
+pycache/
+*.py[cod]
+*$py.class
+
+Project Stargate Secrets & Persistence
+
+These must NEVER be committed to version control
+
+.pfsd/
+-sa.json
+eleutherios-mvp-.json
+eleutherios-mvp-sa.json
+service-account.json
+firebase-credentials.json
+
+Environment Variables
+
+.env
+.env.*
+
+Logs and Debugging
+
+.log
+npm-debug.log
+yarn-debug.log*
+yarn-error.log*
+
+OS / System Files
+
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+Unity / Simulation (if within this repo)
+
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Bb]uild/
+[Bb]uilds/
+[Ll]ogs/
+[Uu]serSettings/
