@@ -30,8 +30,8 @@ Environment Variables
 
 Logs and Debugging
 
-.log
-npm-debug.log
+*.log
+npm-debug*.log
 yarn-debug.log*
 yarn-error.log*
 
