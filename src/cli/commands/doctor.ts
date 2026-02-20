@@ -2,8 +2,17 @@ import { execSync } from 'child_process';
 import { WebSocket } from 'ws';
 import { logger } from '../../utils/logger.js';
 import { loadConfig } from '../../utils/config.js';
+import { initializeApp, cert, getApps } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
+import * as fs from 'fs';
+import * as crypto from 'crypto';
 
-export async function doctor() {
+const SA_FILE = 'eleutherios-mvp-sa.json';
+
+export async function doctor(options: { verifyPic?: boolean }) {
+    if (options.verifyPic) {
+        return await verifyPicChain();
+    }
     logger.cli('Running Stargate Diagnostics (pfsd doctor)...');
 
     // 1. Config Validity
@@ -77,4 +86,65 @@ export async function doctor() {
         clearTimeout(timeout);
         logger.error('Failed to connect to Local Event Bus. Start the server first.');
     });
+}
+
+async function verifyPicChain() {
+    logger.cli('Verifying Merkle PIC Chain integrity (Last 50 entries)...');
+
+    if (!fs.existsSync(SA_FILE)) {
+        logger.error(`${SA_FILE} not found. Cannot verify Firestore.`);
+        return;
+    }
+
+    try {
+        const serviceAccount = JSON.parse(fs.readFileSync(SA_FILE, 'utf-8'));
+        if (getApps().length === 0) {
+            initializeApp({
+                credential: cert(serviceAccount)
+            });
+        }
+        const db = getFirestore();
+        const chainRef = db.collection('artifacts/stargate/public/data/pic_chain');
+        const snapshot = await chainRef.orderBy('timestamp', 'desc').limit(50).get();
+
+        if (snapshot.empty) {
+            logger.warn('PIC Chain is empty. Nothing to verify.');
+            return;
+        }
+
+        const docs = snapshot.docs.map(d => d.data()).filter((d: any) => !!d);
+        let verifiedCount = 0;
+
+        // Iterate backwards through the fetched list (oldest to newest among the 50)
+        for (let i = docs.length - 1; i >= 0; i--) {
+            const current = docs[i];
+            if (!current) continue;
+
+            const dataToHash = { ...current };
+            delete dataToHash.hash;
+            delete dataToHash.bus_timestamp; // Exclude bus-added field
+
+            // Recompute hash: sha256(json_string(data) + prev_hash)
+            // Note: Use a more stable JSON stringify for cross-language matching (no spaces)
+            const dataStr = JSON.stringify(dataToHash, Object.keys(dataToHash).sort());
+            const computedHash = crypto.createHash('sha256').update(dataStr + current.prev_hash).digest('hex');
+
+            if (computedHash !== current.hash) {
+                logger.error(`Merkle Violation detected at hash: ${current.hash}`);
+                logger.error(`Computed: ${computedHash}`);
+                logger.error(`Data String used: ${dataStr}`);
+                logger.error(`Timestamp: ${current.timestamp}`);
+            } else {
+                verifiedCount++;
+            }
+        }
+
+        if (verifiedCount === docs.length) {
+            logger.success(`Merkle Chain Verified: All ${verifiedCount} entries validated successfully.`);
+        } else {
+            logger.warn(`Verification Complete: ${verifiedCount} successes, ${docs.length - verifiedCount} failures.`);
+        }
+    } catch (err) {
+        logger.error(`Verification failed: ${err}`);
+    }
 }

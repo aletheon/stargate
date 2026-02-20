@@ -19,6 +19,7 @@ program
 program
     .command('doctor')
     .description('Run system diagnostics')
+    .option('--verify-pic', 'Verify the Merkle PIC Chain integrity')
     .action(doctor);
 
 const pairing = program.command('pairing').description('Device pairing management');

@@ -34,7 +34,12 @@ export const PolicyUpdate = Type.Object({
     type: Type.Literal('policy.update'),
     id: Type.Optional(Type.String()),
     idempotencyKey: Type.String(),
-    policyGraph: Type.Any(), // Placeholder for now
+    constraints: Type.Any(),
+});
+
+export const PolicyReloaded = Type.Object({
+    type: Type.Literal('policy.reloaded'),
+    id: Type.Optional(Type.String()),
 });
 
 export const IntentPropose = Type.Object({
@@ -51,6 +56,13 @@ export const IntentDecision = Type.Object({
         Type.Literal('VETO'),
         Type.Literal('TRUNCATION'),
     ]),
+    value: Type.Optional(Type.Any()),
+});
+
+export const Observation = Type.Object({
+    type: Type.Literal('observation'),
+    id: Type.Optional(Type.String()),
+    values: Type.Array(Type.Number()),
 });
 
 export const GovernanceWarning = Type.Object({
@@ -90,6 +102,7 @@ export const PfsdMessage = Type.Union([
     HelloOk,
     PairingRequired,
     PolicyUpdate,
+    PolicyReloaded,
     IntentPropose,
     IntentDecision,
     GovernanceWarning,
@@ -97,6 +110,7 @@ export const PfsdMessage = Type.Union([
     HealthRequest,
     BusStatus,
     BusStatusOk,
+    Observation,
 ]);
 
 export type PfsdMessage = Static<typeof PfsdMessage>;
