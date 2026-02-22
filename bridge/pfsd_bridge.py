@@ -9,6 +9,19 @@ from datetime import datetime
 from pip import PIP
 from pfsd_kernel import PFSDKernel
 
+import os
+
+class LocalAuditLogger:
+    def __init__(self, log_dir="/Volumes/Expansion/stargate/audit/"):
+        self.log_path = os.path.join(log_dir, "pic_chain.log")
+        if not os.path.exists(log_dir):
+            os.makedirs(log_dir)
+            print(f"[AUDIT] Created audit directory: {log_dir}")
+        
+    def log(self, record):
+        with open(self.log_path, "a") as f:
+            f.write(json.dumps(record) + "\n")
+
 class PfsdBridge:
     def __init__(self, uri="ws://localhost:8080"):
         self.uri = uri
@@ -24,6 +37,9 @@ class PfsdBridge:
             self.constraints = {"MAX_VELOCITY": {"limit": 5.0, "warning_threshold": 4.0}}
         
         self.kernel = PFSDKernel(self.constraints)
+        
+        # Phase 4.5: Local Audit Logging
+        self.audit_logger = LocalAuditLogger()
         
         # MLX-backed rolling buffer for observations
         self.buffer_size = 1000
@@ -56,11 +72,18 @@ class PfsdBridge:
                         print("[BRIDGE] Authorized by Event Bus.")
                     
                     elif data.get("type") == "policy.reloaded":
-                        # Re-fetch effective constraints via PIP
-                        self.constraints = self.pip.get_effective_constraints()
-                        # Update the Kernel with new rules
-                        self.kernel.update_constraints(self.constraints)
-                        print("[GOVERNANCE] Iron Lattice Updated.")
+                        # The bus broadcasts new constraints in the message
+                        new_constraints = data.get("constraints")
+                        if new_constraints:
+                            self.constraints = new_constraints
+                            # Update the Kernel with new rules (in-place on existing object)
+                            self.kernel.constraints = self.constraints
+                            print(f"[GOVERNANCE] Iron Lattice Updated: {self.constraints}")
+                        else:
+                            # Fallback to PIP if constraints not in message
+                            self.constraints = self.pip.get_effective_constraints()
+                            self.kernel.constraints = self.constraints
+                            print("[GOVERNANCE] Iron Lattice Reloaded from PIP.")
 
                     elif data.get("type") == "semantic.context":
                         print(f"[BRIDGE] Semantic Context Update: {len(data['tags'])} objects detected.")
@@ -85,7 +108,7 @@ class PfsdBridge:
         pos_y = 0.0
         pos_z = 0.0
         
-        target_speed = 5.0
+        target_speed = 20.0  # Aggressive pilot intent to verify truncation
         radius = 20.0
         angular_vel = target_speed / radius
 
@@ -100,6 +123,11 @@ class PfsdBridge:
             
             # 3. PIC Generation for Audit
             pic = self.kernel.generate_pic("intent.propose", intent_value, decision, final_value, reason)
+            
+            # Hybrid Storage: Always log locally
+            self.audit_logger.log(pic)
+            
+            # Phase 4.6: Send ALL PIC records to Bus for live UI (No cloud persistence in Bus)
             await websocket.send(json.dumps({"type": "pic.append", "record": pic}))
             
             # 4. Kinematic Update (using governed velocity)
@@ -134,7 +162,10 @@ class PfsdBridge:
         # PIC Generation
         pic = self.kernel.generate_pic("intent.propose", value, decision, result, reason)
         
-        # Send PIC to Bus for persistence
+        # Hybrid Storage: Always log locally
+        self.audit_logger.log(pic)
+        
+        # Phase 4.6: Send ALL PIC records to Bus for live UI (No cloud persistence in Bus)
         await websocket.send(json.dumps({
             "type": "pic.append",
             "record": pic

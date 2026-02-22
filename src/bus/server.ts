@@ -195,21 +195,17 @@ class EventBus {
         }
 
         if (msg.type === 'pic.append') {
-            // Forward auditable records to consoles
+            // Forward auditable records to consoles (Always broadcast for UI dots)
+            // Phase 4.6 Zero-Cloud: Persistence logic removed
             for (const s of this.sessions.values()) {
                 if (s.role === 'console' && s.paired) {
                     this.send(s.ws, msg);
                 }
             }
-            this.persistToFirestore('artifacts/stargate/public/data/pic_chain', msg.record);
         }
 
         if (msg.type === 'governance.warning') {
-            this.persistToFirestore('artifacts/stargate/public/data/warnings', {
-                message: msg.message,
-                deviceId: session.deviceId,
-                role: session.role
-            });
+            // Phase 4.6 Zero-Cloud: Persistence logic removed
         }
 
         // Handle other messages...
